@@ -25,19 +25,19 @@ class CameraView extends StatefulWidget {
 
 class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   /// List of available cameras
-  List<CameraDescription> cameras;
+  List<CameraDescription> cameras = [];
 
   /// Controller
-  CameraController cameraController;
+  CameraController cameraController = CameraController(CameraDescription., ResolutionPreset.low);
 
   /// true when inference is ongoing
-  bool predicting;
+  bool? predicting;
 
   /// Instance of [Classifier]
-  Classifier classifier;
+  Classifier? classifier;
 
   /// Instance of [IsolateUtils]
-  IsolateUtils isolateUtils;
+  IsolateUtils? isolateUtils;
 
   @override
   void initState() {
@@ -50,7 +50,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
 
     // Spawn a new isolate
     isolateUtils = IsolateUtils();
-    await isolateUtils.start();
+    await isolateUtils!.start();
 
     // Camera initialization
     initializeCamera();
@@ -68,16 +68,16 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
 
     // cameras[0] for rear-camera
     cameraController =
-        CameraController(cameras[0], ResolutionPreset.low, enableAudio: false);
+        CameraController(cameras![0], ResolutionPreset.low, enableAudio: false);
 
-    cameraController.initialize().then((_) async {
+    cameraController!.initialize().then((_) async {
       // Stream of image passed to [onLatestImageAvailable] callback
-      await cameraController.startImageStream(onLatestImageAvailable);
+      await cameraController!.startImageStream(onLatestImageAvailable);
 
       /// previewSize is size of each image frame captured by controller
       ///
       /// 352x288 on iOS, 240p (320x240) on Android with ResolutionPreset.low
-      Size previewSize = cameraController.value.previewSize;
+      Size? previewSize = cameraController!.value.previewSize;
 
       /// previewSize is size of raw input image to the model
       CameraViewSingleton.inputImageSize = previewSize;
@@ -86,27 +86,27 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       // same as screenWidth while maintaining the aspectRatio
       Size screenSize = MediaQuery.of(context).size;
       CameraViewSingleton.screenSize = screenSize;
-      CameraViewSingleton.ratio = screenSize.width / previewSize.height;
+      CameraViewSingleton.ratio = screenSize.width / previewSize!.height;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     // Return empty container while the camera is not initialized
-    if (cameraController == null || !cameraController.value.isInitialized) {
+    if (cameraController == null || !cameraController!.value.isInitialized) {
       return Container();
     }
 
     return AspectRatio(
-        aspectRatio: cameraController.value.aspectRatio,
-        child: CameraPreview(cameraController));
+        aspectRatio: cameraController!.value.aspectRatio,
+        child: CameraPreview(cameraController!));
   }
 
   /// Callback to receive each frame [CameraImage] perform inference on it
   onLatestImageAvailable(CameraImage cameraImage) async {
-    if (classifier.interpreter != null && classifier.labels != null) {
+    if (classifier!.interpreter != null && classifier!.labels != null) {
       // If previous inference has not completed then return
-      if (predicting) {
+      if (predicting!) {
         return;
       }
 
@@ -118,7 +118,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
 
       // Data to be passed to inference isolate
       var isolateData = IsolateData(
-          cameraImage, classifier.interpreter.address, classifier.labels);
+          cameraImage, classifier!.interpreter!.address, classifier!.labels!);
 
       // We could have simply used the compute method as well however
       // it would be as in-efficient as we need to continuously passing data
@@ -147,7 +147,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   /// Runs inference in another isolate
   Future<Map<String, dynamic>> inference(IsolateData isolateData) async {
     ReceivePort responsePort = ReceivePort();
-    isolateUtils.sendPort
+    isolateUtils!.sendPort!
         .send(isolateData..responsePort = responsePort.sendPort);
     var results = await responsePort.first;
     return results;
@@ -157,11 +157,11 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     switch (state) {
       case AppLifecycleState.paused:
-        cameraController.stopImageStream();
+        cameraController!.stopImageStream();
         break;
       case AppLifecycleState.resumed:
-        if (!cameraController.value.isStreamingImages) {
-          await cameraController.startImageStream(onLatestImageAvailable);
+        if (!cameraController!.value.isStreamingImages) {
+          await cameraController!.startImageStream(onLatestImageAvailable);
         }
         break;
       default:
@@ -171,7 +171,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    cameraController.dispose();
+    cameraController!.dispose();
     super.dispose();
   }
 }
